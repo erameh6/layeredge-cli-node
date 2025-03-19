@@ -26,14 +26,21 @@ source $HOME/.cargo/env
 # Verify Rust installation
 rustc --version
 
+# Ensure Cargo is in PATH before installing Risc0
+if ! command -v cargo &> /dev/null; then
+    echo "Cargo not found in PATH. Adding it now..."
+    export PATH="$HOME/.cargo/bin:$PATH"
+    echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+    source ~/.bashrc
+else
+    echo "Cargo is already in PATH."
+fi
+
 # Install Risc0 Toolchain
 echo "Installing Risc0 Toolchain..."
 curl -L https://risczero.com/install | bash
-~/.cargo/bin/rzup install
-
-# Add Risc0 Toolchain to current session and profile
-export PATH="$PATH:$HOME/.cargo/bin"
-echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> ~/.bashrc
+source $HOME/.cargo/env  # Ensure Cargo environment is loaded
+rzup install
 
 # Prompt the user for their private key securely
 read -sp "Please enter your private key: " PRIVATE_KEY
@@ -65,6 +72,12 @@ cd ..
 # Build and run the LayerEdge light node
 echo "Building and running the LayerEdge light node..."
 go build
-./light-node &
 
-echo "LayerEdge light node setup complete!"
+# Check if the binary exists before running
+if [ -f "./light-node" ]; then
+    ./light-node &
+    echo "LayerEdge light node setup complete!"
+else
+    echo "Error: light-node binary not found. Build may have failed."
+    exit 1
+fi
