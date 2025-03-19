@@ -5,6 +5,8 @@ set -e  # Exit immediately if any command fails
 echo "Updating package lists and installing dependencies..."
 apt update && apt install -y screen curl git lsof psmisc
 
+# nothing
+
 # Function to kill any process using port 3001
 kill_process_on_port() {
     if command -v fuser &>/dev/null; then
