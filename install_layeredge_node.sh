@@ -61,26 +61,24 @@ else
     echo "LayerEdge light node directory already exists. Skipping clone..."
 fi
 
-# **Ensure the script continues execution even if the directory exists**
-cd light-node || { echo "Failed to enter light-node directory!"; exit 1; }
-
 # Kill any process using port 3001
 kill_process_on_port
 
 # Run in a detached screen session
 echo "Starting LayerEdge node in a screen session..."
 screen -dmS layeredge bash -c '
-    cd risc0-merkle-service
+    cd light-node/risc0-merkle-service
     echo "Building Merkle service..."
     cargo build --release
     ./target/release/host &
 
-    cd ..
+    cd ../..
     echo "Building and running LayerEdge light node..."
+    cd light-node
     go mod tidy
     go build -o light-node
     ./light-node
 '
 
 echo "LayerEdge node is now running in a detached screen session."
-echo "To attach to the session, use: screen -r layeredge"
+echo "To attach to the session, use: screen -r layeredge
