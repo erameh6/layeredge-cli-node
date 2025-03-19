@@ -25,7 +25,6 @@ wget -q https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz -O /tmp/go$GO_
 tar -C /usr/local -xzf /tmp/go$GO_VERSION.linux-amd64.tar.gz
 export PATH=$PATH:/usr/local/go/bin
 echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
-source ~/.bashrc
 
 # Verify Go installation
 if ! go version | grep -q "go$GO_VERSION"; then
@@ -41,7 +40,7 @@ fi
 
 echo "Installing RISC Zero toolchain..."
 if ! command -v rzup &>/dev/null; then
-    if curl -L https://raw.githubusercontent.com/risc0/rzup/main/install.sh -o /tmp/rzup_install.sh; then
+    if curl -L https://risczero.com/install -o /tmp/rzup_install.sh; then
         bash /tmp/rzup_install.sh
         source "$HOME/.bashrc"
     else
@@ -50,12 +49,6 @@ if ! command -v rzup &>/dev/null; then
         cargo binstall cargo-risczero
     fi
 fi
-
-# Verify RISC Zero installation
-rzup install cargo-risczero
-rzup install cpp
-rzup install r0vm
-rzup install rust
 
 echo "Please enter your private key:"
 read -s PRIVATE_KEY
