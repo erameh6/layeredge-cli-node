@@ -4,7 +4,11 @@
 echo "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
-# Install Go (version 1.18 or higher)
+# Remove any existing Go installation
+echo "Removing any existing Go installation..."
+sudo rm -rf /usr/local/go
+
+# Install Go (version 1.18.10)
 echo "Installing Go..."
 wget https://golang.org/dl/go1.18.10.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.18.10.linux-amd64.tar.gz
@@ -27,9 +31,13 @@ echo "Installing Risc0 Toolchain..."
 curl -L https://risczero.com/install | bash
 ~/.cargo/bin/rzup install
 
+# Add Risc0 Toolchain to current session and profile
+export PATH="$PATH:$HOME/.cargo/bin"
+echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> ~/.bashrc
+
 # Prompt the user for their private key securely
 read -sp "Please enter your private key: " PRIVATE_KEY
-echo  # Move to a new line after input
+echo -e "\nPrivate key recorded!"
 
 # Set environment variables
 echo "Setting environment variables..."
