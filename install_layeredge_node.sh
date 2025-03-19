@@ -5,16 +5,25 @@ echo "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
 # Remove old Go version (if exists)
+echo "Removing old Go version..."
 sudo rm -rf /usr/local/go
 
 # Install Go (version 1.23)
 echo "Installing Go..."
 wget https://go.dev/dl/go1.23.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.23.linux-amd64.tar.gz
-echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
+
+# Ensure Go is added to PATH
+echo "Adding Go to PATH..."
+echo "export PATH=/usr/local/go/bin:\$PATH" >> ~/.bashrc
+export PATH=/usr/local/go/bin:$PATH
 source ~/.bashrc
 
 # Verify Go installation
+if ! command -v go &> /dev/null; then
+    echo "Go installation failed! Exiting..."
+    exit 1
+fi
 go version
 
 # Install Rust (version 1.81.0 or higher)
@@ -34,6 +43,7 @@ curl -L https://risczero.com/install | bash
 if ! command -v cargo &> /dev/null; then
     echo "Cargo not found! Adding it to PATH..."
     echo "export PATH=\$HOME/.cargo/bin:\$PATH" >> ~/.bashrc
+    export PATH=$HOME/.cargo/bin:$PATH
     source ~/.bashrc
 fi
 
@@ -73,6 +83,10 @@ cd ..
 # Build and run the LayerEdge light node
 echo "Building and running the LayerEdge light node..."
 go build
+if [[ ! -f "./light-node" ]]; then
+    echo "Error: light-node binary not found! Build failed."
+    exit 1
+fi
 ./light-node &
 
 echo "LayerEdge light node setup complete!"
