@@ -1,89 +1,78 @@
 #!/bin/bash
 
-# Update system packages
-echo "Updating system packages..."
-sudo apt update && sudo apt upgrade -y
+set -e
 
-# Remove old Go version if it exists
-echo "Removing old Go version..."
-sudo rm -rf /usr/local/go
-
-# Install Go (version 1.23.1)
-echo "Installing Go 1.23.1..."
-wget https://go.dev/dl/go1.23.1.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.23.1.linux-amd64.tar.gz
-echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
-source ~/.bashrc
-
-# Verify Go installation
-go version || { echo "Go installation failed! Exiting..."; exit 1; }
-
-# Install Rust
-echo "Installing Rust..."
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-source $HOME/.cargo/env
-
-# Verify Rust installation
-rustc --version || { echo "Rust installation failed! Exiting..."; exit 1; }
-
-# Install Risc0 Toolchain
-echo "Installing Risc0 Toolchain..."
-curl -L https://risczero.com/install | bash
-
-# Add Risc0 to PATH and install
-export PATH=$PATH:/root/.risc0/bin
-/root/.risc0/bin/rzup install || { echo "Risc0 installation failed! Exiting..."; exit 1; }
-
-# Prompt the user for their private key securely
-read -sp "Please enter your private key: " PRIVATE_KEY
-echo  # Move to a new line after input
-echo "Private key recorded."
-
-# Create .env file
-cat <<EOF > ~/.layeredge-env
-GRPC_URL=34.31.74.109:9090
-CONTRACT_ADDR=cosmos1ufs3tlq4umljk0qfe8k5ya0x6hpavn897u2cnf9k0en9jr7qarqqt56709
-ZK_PROVER_URL=http://127.0.0.1:3001
-API_REQUEST_TIMEOUT=100
-POINTS_API=http://127.0.0.1:8080
-PRIVATE_KEY=$PRIVATE_KEY
-EOF
-
-# Load environment variables
-export $(cat ~/.layeredge-env | xargs)
-
-# Check if LayerEdge repo exists
-if [ -d "light-node" ]; then
-    echo "LayerEdge light node directory already exists. Skipping clone..."
-    cd light-node
-else
-    echo "Cloning LayerEdge light node repository..."
-    git clone https://github.com/Layer-Edge/light-node.git
-    cd light-node
+# Ensure script is running as root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Please run as root (use sudo)."
+    exit 1
 fi
 
-# Kill any process using port 3001
-PORT=3001
-PID=$(lsof -ti:$PORT)
-if [ -n "$PID" ]; then
-    echo "Port $PORT is in use. Killing process..."
-    kill -9 $PID
+# Function to install Go 1.23.1
+install_go() {
+    echo "Removing old Go version..."
+    rm -rf /usr/local/go
+
+    echo "Installing Go 1.23.1..."
+    wget https://dl.google.com/go/go1.23.1.linux-amd64.tar.gz -O /tmp/go1.23.1.linux-amd64.tar.gz
+    tar -C /usr/local -xzf /tmp/go1.23.1.linux-amd64.tar.gz
+    rm /tmp/go1.23.1.linux-amd64.tar.gz
+
+    export PATH="/usr/local/go/bin:$PATH"
+    echo 'export PATH="/usr/local/go/bin:$PATH"' >> ~/.bashrc
+    source ~/.bashrc
+
+    go version
+}
+
+# Ensure Go is installed and correct version is used
+if ! command -v go &> /dev/null || [[ "$(go version)" != *"go1.23.1"* ]]; then
+    install_go
 fi
 
-# Start the Merkle service
-echo "Starting the Merkle service..."
-cd risc0-merkle-service
-cargo build
-cargo run &
+# Install required dependencies
+apt update && apt install -y screen curl git lsof fuser
 
-# Return to the light-node directory
-cd ..
+# Kill any existing process using port 3001
+echo "Checking for existing processes on port 3001..."
+if lsof -i :3001 &> /dev/null; then
+    echo "Port 3001 is in use. Killing process..."
+    fuser -k 3001/tcp
+fi
 
-# Build and run the LayerEdge light node
-echo "Building and running the LayerEdge light node..."
-go build || { echo "Go build failed! Exiting..."; exit 1; }
+# Clone LayerEdge light node if not already cloned
+cd ~
+if [ ! -d "layeredge-cli-node" ]; then
+    git clone https://github.com/LayerEdge-Network/layeredge-cli-node.git
+fi
+cd layeredge-cli-node
 
-# Run the light-node
-./light-node &
+# Install Risc0 toolchain if not installed
+if ! command -v rzup &> /dev/null; then
+    echo "Installing Risc0 Toolchain..."
+    curl --proto '=https' --tlsv1.2 -sSf https://risc0.com/install.sh | sh
+    export PATH="$HOME/.cargo/bin:$HOME/.risc0/bin:$PATH"
+    echo 'export PATH="$HOME/.cargo/bin:$HOME/.risc0/bin:$PATH"' >> ~/.bashrc
+    source ~/.bashrc
+fi
 
-echo "LayerEdge light node setup complete!"
+# Ensure cargo-risczero is installed
+rzup install cargo-risczero@1.2.5
+rzup default cargo-risczero@1.2.5
+
+# Ensure .env file exists
+ENV_FILE="$HOME/layeredge-cli-node/light-node/.env"
+if [ ! -f "$ENV_FILE" ]; then
+    echo "Creating .env file..."
+    read -p "Please enter your private key: " PRIVATE_KEY
+    echo "PRIVATE_KEY=$PRIVATE_KEY" > "$ENV_FILE"
+    echo ".env file created successfully."
+fi
+
+# Start the LayerEdge node in a detached screen session
+echo "Starting LayerEdge light node in a screen session..."
+screen -S layeredge-node -dm bash -c 'cd ~/layeredge-cli-node/light-node && export $(cat .env | xargs) && ./light-node'
+
+echo "LayerEdge light node is now running in a screen session named 'layeredge-node'."
+echo "To attach to it, run: screen -r layeredge-node"
+echo "To detach, press Ctrl + A, then D."
