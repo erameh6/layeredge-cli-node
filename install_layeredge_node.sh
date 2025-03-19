@@ -1,78 +1,82 @@
 #!/bin/bash
 
-set -e
+set -e  # Exit immediately if any command fails
 
-# Ensure script is running as root
-if [ "$(id -u)" -ne 0 ]; then
-    echo "Please run as root (use sudo)."
+echo "Updating package lists and installing dependencies..."
+apt update && apt install -y screen curl git lsof psmisc
+
+# Function to kill any process using port 3001
+kill_process_on_port() {
+    if command -v fuser &>/dev/null; then
+        fuser -k 3001/tcp 2>/dev/null && echo "Killed process using port 3001 with fuser."
+    else
+        echo "fuser not found, using lsof instead..."
+        lsof -ti :3001 | xargs kill -9 2>/dev/null || echo "No process found on port 3001."
+    fi
+}
+
+echo "Removing old Go version..."
+rm -rf /usr/local/go
+
+# Install Go
+GO_VERSION="1.23.1"
+echo "Installing Go $GO_VERSION..."
+wget -q https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz -O /tmp/go$GO_VERSION.linux-amd64.tar.gz
+tar -C /usr/local -xzf /tmp/go$GO_VERSION.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
+
+# Verify Go installation
+if ! go version | grep -q "go$GO_VERSION"; then
+    echo "Go installation failed! Exiting..."
     exit 1
 fi
 
-# Function to install Go 1.23.1
-install_go() {
-    echo "Removing old Go version..."
-    rm -rf /usr/local/go
-
-    echo "Installing Go 1.23.1..."
-    wget https://dl.google.com/go/go1.23.1.linux-amd64.tar.gz -O /tmp/go1.23.1.linux-amd64.tar.gz
-    tar -C /usr/local -xzf /tmp/go1.23.1.linux-amd64.tar.gz
-    rm /tmp/go1.23.1.linux-amd64.tar.gz
-
-    export PATH="/usr/local/go/bin:$PATH"
-    echo 'export PATH="/usr/local/go/bin:$PATH"' >> ~/.bashrc
-    source ~/.bashrc
-
-    go version
-}
-
-# Ensure Go is installed and correct version is used
-if ! command -v go &> /dev/null || [[ "$(go version)" != *"go1.23.1"* ]]; then
-    install_go
+echo "Installing Rust and Risc0 toolchain..."
+if ! command -v rustc &>/dev/null; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
 fi
 
-# Install required dependencies
-apt update && apt install -y screen curl git lsof fuser
-
-# Kill any existing process using port 3001
-echo "Checking for existing processes on port 3001..."
-if lsof -i :3001 &> /dev/null; then
-    echo "Port 3001 is in use. Killing process..."
-    fuser -k 3001/tcp
+if ! command -v rzup &>/dev/null; then
+    curl -fsSL https://github.com/risc0/rzup/releases/latest/download/rzup-installer.sh | sh
+    source "$HOME/.bashrc"
 fi
 
-# Clone LayerEdge light node if not already cloned
-cd ~
-if [ ! -d "layeredge-cli-node" ]; then
-    git clone https://github.com/LayerEdge-Network/layeredge-cli-node.git
-fi
-cd layeredge-cli-node
+rzup install cargo-risczero
+rzup install cpp
+rzup install r0vm
+rzup install rust
 
-# Install Risc0 toolchain if not installed
-if ! command -v rzup &> /dev/null; then
-    echo "Installing Risc0 Toolchain..."
-    curl --proto '=https' --tlsv1.2 -sSf https://risc0.com/install.sh | sh
-    export PATH="$HOME/.cargo/bin:$HOME/.risc0/bin:$PATH"
-    echo 'export PATH="$HOME/.cargo/bin:$HOME/.risc0/bin:$PATH"' >> ~/.bashrc
-    source ~/.bashrc
-fi
+echo "Please enter your private key:"
+read -s PRIVATE_KEY
+echo "Private key recorded."
 
-# Ensure cargo-risczero is installed
-rzup install cargo-risczero@1.2.5
-rzup default cargo-risczero@1.2.5
-
-# Ensure .env file exists
-ENV_FILE="$HOME/layeredge-cli-node/light-node/.env"
-if [ ! -f "$ENV_FILE" ]; then
-    echo "Creating .env file..."
-    read -p "Please enter your private key: " PRIVATE_KEY
-    echo "PRIVATE_KEY=$PRIVATE_KEY" > "$ENV_FILE"
-    echo ".env file created successfully."
+# Clone LayerEdge light node if it doesn't exist
+if [ ! -d "light-node" ]; then
+    git clone https://github.com/LayerEdge/light-node.git
+else
+    echo "LayerEdge light node directory already exists. Skipping clone..."
 fi
 
-# Start the LayerEdge node in a detached screen session
-echo "Starting LayerEdge light node in a screen session..."
-screen -S layeredge-node -dm bash -c 'cd ~/layeredge-cli-node/light-node && export $(cat .env | xargs) && ./light-node'
+# Kill any process using port 3001
+kill_process_on_port
 
-echo "LayerEdge light node is now running in a screen session named 'layeredge-node'."
-echo "To attach to it, run: screen -r layeredge-node"
-echo "To detach, press Ctrl + A, then D."
+# Run in a detached screen session
+echo "Starting LayerEdge node in a screen session..."
+screen -dmS layeredge bash -c '
+    cd light-node/risc0-merkle-service
+    echo "Building Merkle service..."
+    cargo build --release
+    ./target/release/host &
+
+    cd ../..
+    echo "Building and running LayerEdge light node..."
+    cd light-node
+    go mod tidy
+    go build -o light-node
+    ./light-node
+'
+
+echo "LayerEdge node is now running in a detached screen session."
+echo "To attach to the session, use: screen -r layeredge"
