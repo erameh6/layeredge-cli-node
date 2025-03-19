@@ -61,7 +61,7 @@ else
     echo "LayerEdge light node directory already exists. Skipping clone..."
 fi
 
-# Always continue the execution, even if the directory exists
+# **Ensure the script continues execution even if the directory exists**
 cd light-node || { echo "Failed to enter light-node directory!"; exit 1; }
 
 # Kill any process using port 3001
