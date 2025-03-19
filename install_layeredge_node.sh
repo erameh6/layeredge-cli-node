@@ -8,17 +8,17 @@ sudo apt update && sudo apt upgrade -y
 echo "Removing old Go version..."
 sudo rm -rf /usr/local/go
 
-# Install Go (version 1.22.1)
-echo "Installing Go..."
-wget https://dl.google.com/go/go1.22.1.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.22.1.linux-amd64.tar.gz
+# Install Go (version 1.23.1)
+echo "Installing Go 1.23.1..."
+wget https://go.dev/dl/go1.23.1.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.23.1.linux-amd64.tar.gz
 echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
 source ~/.bashrc
 
 # Verify Go installation
 go version || { echo "Go installation failed! Exiting..."; exit 1; }
 
-# Install Rust (version 1.85.1 or higher)
+# Install Rust
 echo "Installing Rust..."
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source $HOME/.cargo/env
@@ -32,7 +32,7 @@ curl -L https://risczero.com/install | bash
 
 # Add Risc0 to PATH and install
 export PATH=$PATH:/root/.risc0/bin
-rzup install || { echo "Risc0 installation failed! Exiting..."; exit 1; }
+/root/.risc0/bin/rzup install || { echo "Risc0 installation failed! Exiting..."; exit 1; }
 
 # Prompt the user for their private key securely
 read -sp "Please enter your private key: " PRIVATE_KEY
@@ -52,10 +52,23 @@ EOF
 # Load environment variables
 export $(cat ~/.layeredge-env | xargs)
 
-# Clone the LayerEdge light node repository
-echo "Cloning LayerEdge light node repository..."
-git clone https://github.com/Layer-Edge/light-node.git
-cd light-node
+# Check if LayerEdge repo exists
+if [ -d "light-node" ]; then
+    echo "LayerEdge light node directory already exists. Skipping clone..."
+    cd light-node
+else
+    echo "Cloning LayerEdge light node repository..."
+    git clone https://github.com/Layer-Edge/light-node.git
+    cd light-node
+fi
+
+# Kill any process using port 3001
+PORT=3001
+PID=$(lsof -ti:$PORT)
+if [ -n "$PID" ]; then
+    echo "Port $PORT is in use. Killing process..."
+    kill -9 $PID
+fi
 
 # Start the Merkle service
 echo "Starting the Merkle service..."
