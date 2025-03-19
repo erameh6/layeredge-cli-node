@@ -32,21 +32,23 @@ if ! go version | grep -q "go$GO_VERSION"; then
     exit 1
 fi
 
-echo "Installing Rust and Risc0 toolchain..."
+echo "Installing Rust..."
 if ! command -v rustc &>/dev/null; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     source "$HOME/.cargo/env"
 fi
 
+echo "Installing RISC Zero toolchain..."
 if ! command -v rzup &>/dev/null; then
-    curl -fsSL https://github.com/risc0/rzup/releases/latest/download/rzup-installer.sh | sh
-    source "$HOME/.bashrc"
+    if curl -L https://risczero.com/install -o /tmp/rzup_install.sh; then
+        bash /tmp/rzup_install.sh
+        source "$HOME/.bashrc"
+    else
+        echo "rzup installer not available, attempting alternative installation..."
+        cargo install cargo-binstall
+        cargo binstall cargo-risczero
+    fi
 fi
-
-rzup install cargo-risczero
-rzup install cpp
-rzup install r0vm
-rzup install rust
 
 echo "Please enter your private key:"
 read -s PRIVATE_KEY
@@ -79,4 +81,4 @@ screen -dmS layeredge bash -c '
 '
 
 echo "LayerEdge node is now running in a detached screen session."
-echo "To attach to the session, use: screen -r layeredge"
+echo "To attach to the session, use: screen -r layeredge
