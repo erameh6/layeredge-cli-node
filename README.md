@@ -1,2 +1,4 @@
 # layeredge-cli-node
-this is script to automate the installation process
+this is script to automats the installation process
+
+# 
