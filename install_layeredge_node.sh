@@ -6,13 +6,20 @@ sudo apt update && sudo apt upgrade -y
 
 # Remove any existing Go installation
 echo "Removing any existing Go installation..."
-sudo rm -rf /usr/local/go
+sudo rm -rf /usr/local/go /usr/bin/go /usr/local/bin/go
 
-# Install Go (version 1.18.10)
-echo "Installing Go..."
-wget https://golang.org/dl/go1.18.10.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.18.10.linux-amd64.tar.gz
+# Install Go 1.23
+GO_VERSION="1.23"
+GO_URL="https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz"
+
+echo "Installing Go $GO_VERSION..."
+wget $GO_URL
+sudo tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz
+rm go${GO_VERSION}.linux-amd64.tar.gz
+
+# Add Go to the PATH
 echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
+export PATH=$PATH:/usr/local/go/bin
 source ~/.bashrc
 
 # Verify Go installation
