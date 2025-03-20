@@ -69,6 +69,12 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
+# Load environment variables from the .env file
+echo "Loading environment variables from .env..."
+set -o allexport
+source .env
+set +o allexport
+
 # Kill any process using port 3001
 PORT=3001
 PID=$(lsof -ti:$PORT)
@@ -85,10 +91,6 @@ cargo run &
 
 # Return to the light-node directory
 cd ..
-
-# Load the .env file before running the node
-echo "Loading environment variables..."
-export $(grep -v '^#' .env | xargs)
 
 # Build and run the LayerEdge light node
 echo "Building and running the LayerEdge light node..."
