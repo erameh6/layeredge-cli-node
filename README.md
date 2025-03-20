@@ -1,5 +1,5 @@
 # layeredge-cli-node
-this is script to automats the installation process by automatically installing all dependencies and adding them to your path.
+this is script to automates the installation process by automatically installing all dependencies and adding them to your path.
 
 
 # how to install?
