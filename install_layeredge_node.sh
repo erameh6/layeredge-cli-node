@@ -63,17 +63,21 @@ POINTS_API=http://127.0.0.1:8080
 PRIVATE_KEY=$PRIVATE_KEY
 EOF
 
+# Set proper permissions and output the file for debugging
+chmod 644 .env
+echo "Contents of .env file:"
+cat .env
+
+# Optionally convert to Unix line endings if dos2unix is available
+if command -v dos2unix &>/dev/null; then
+    dos2unix .env
+fi
+
 # Verify .env file exists
 if [ ! -f ".env" ]; then
     echo "Error: .env file was not created! Exiting..."
     exit 1
 fi
-
-# Load environment variables from the .env file
-echo "Loading environment variables from .env..."
-set -o allexport
-source .env
-set +o allexport
 
 # Kill any process using port 3001
 PORT=3001
@@ -91,6 +95,12 @@ cargo run &
 
 # Return to the light-node directory
 cd ..
+
+# Load the .env file before running the node
+echo "Loading environment variables from .env..."
+set -o allexport
+source .env
+set +o allexport
 
 # Build and run the LayerEdge light node
 echo "Building and running the LayerEdge light node..."
